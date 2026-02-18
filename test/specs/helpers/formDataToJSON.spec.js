@@ -54,18 +54,42 @@ describe('formDataToJSON', function () {
     formData.append('foo[0]', '1');
     formData.append('foo[1]', '2');
     formData.append('__proto__.x', 'hack');
-    formData.append('constructor.prototype.y', 'value');
 
     expect(formDataToJSON(formData)).toEqual({
       foo: ['1', '2'],
-      constructor: {
-        prototype: {
-          y: 'value',
-        },
-      },
     });
 
     expect({}.x).toEqual(undefined);
-    expect({}.y).toEqual(undefined);
+  });
+
+  it('should block constructor and prototype keys to prevent prototype pollution', () => {
+    const formData = new FormData();
+
+    formData.append('constructor.prototype.polluted', 'true');
+    formData.append('constructor', 'value');
+    formData.append('prototype', 'value');
+    formData.append('safe', 'data');
+
+    const result = formDataToJSON(formData);
+
+    expect(result).toEqual({
+      safe: 'data',
+    });
+
+    // Ensure no prototype pollution occurred
+    expect({}.polluted).toEqual(undefined);
+    expect(Object.prototype.polluted).toEqual(undefined);
+  });
+
+  it('should block nested constructor and prototype keys', () => {
+    const formData = new FormData();
+
+    formData.append('foo[constructor][prototype][bar]', 'hack');
+    formData.append('foo[safe]', 'data');
+
+    const result = formDataToJSON(formData);
+
+    expect(result.foo.safe).toEqual('data');
+    expect({}.bar).toEqual(undefined);
   });
 });
